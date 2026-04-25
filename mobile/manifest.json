@@ -1,0 +1,10 @@
+{
+  "name": "Lyra Breakcore OS",
+  "short_name": "Lyra",
+  "description": "Player de música local com visual Breakcore Glitch OS.",
+  "display": "standalone",
+  "background_color": "#050505",
+  "theme_color": "#050505",
+  "start_url": "./index.html",
+  "icons": []
+}
