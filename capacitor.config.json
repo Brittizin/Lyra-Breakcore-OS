@@ -1,0 +1,10 @@
+{
+  "appId": "com.brittizin.lyrabreakcoreos",
+  "appName": "Lyra Breakcore OS",
+  "webDir": "mobile",
+  "bundledWebRuntime": false,
+  "android": {
+    "allowMixedContent": false,
+    "webContentsDebuggingEnabled": true
+  }
+}
