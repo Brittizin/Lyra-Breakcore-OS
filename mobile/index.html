@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#050505">
+  <title>Lyra — Breakcore OS</title>
+  <link rel="manifest" href="./manifest.json">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body class="booting">
+  <div class="noise-layer" aria-hidden="true"></div>
+  <div class="scanline-layer" aria-hidden="true"></div>
+  <div class="glow-orb glow-orb-a" aria-hidden="true"></div>
+  <div class="glow-orb glow-orb-b" aria-hidden="true"></div>
+
+  <div class="boot-screen" id="bootScreen">
+    <div class="boot-mark">LYRA//BREAKCORE_OS</div>
+    <div class="boot-copy">
+      <strong>Inicializando launcher de áudio</strong>
+      <span>Roteando biblioteca local, visualizer e módulos glitch.</span>
+    </div>
+    <div class="boot-bars" aria-hidden="true">
+      <span></span><span></span><span></span><span></span><span></span>
+    </div>
+  </div>
+
+  <main class="app-shell">
+    <header class="topbar panel">
+      <div>
+        <p class="eyebrow">Music Launcher</p>
+        <h1>Lyra <span>Breakcore OS</span></h1>
+      </div>
+      <button class="icon-button accent-ring" id="openNowPlaying" type="button" aria-label="Abrir modo tela cheia">
+        <span class="icon icon-expand"></span>
+      </button>
+    </header>
+
+    <section class="hero panel launcher-screen screen active" id="screen-home" data-screen="home">
+      <div class="hero-copy">
+        <p class="eyebrow">Launcher</p>
+        <h2>Sistema musical glitchado para ouvir, salvar e organizar offline.</h2>
+        <p class="hero-text">Biblioteca local, playlists persistentes, fila viva e um visual neon agressivo otimizado para Android.</p>
+      </div>
+      <div class="hero-actions">
+        <button class="primary-action" id="addSongsCta" type="button">Importar faixas</button>
+        <button class="secondary-action" id="openLibraryCta" type="button">Abrir biblioteca</button>
+        <button class="secondary-action" type="button" data-open-screen="glitch">Modo glitch</button>
+      </div>
+      <div class="launcher-grid">
+        <article class="launcher-card panel">
+          <span class="launcher-label">Faixas</span>
+          <strong id="statTracks">0</strong>
+          <small>salvas offline</small>
+        </article>
+        <article class="launcher-card panel">
+          <span class="launcher-label">Playlists</span>
+          <strong id="statPlaylists">0</strong>
+          <small>carregadas</small>
+        </article>
+        <article class="launcher-card panel">
+          <span class="launcher-label">Fila</span>
+          <strong id="statQueue">0</strong>
+          <small>itens visíveis</small>
+        </article>
+      </div>
+      <div class="launcher-panels">
+        <article class="module panel">
+          <div class="module-head">
+            <p class="eyebrow">Active Deck</p>
+            <button class="text-action" type="button" data-open-screen="player">Entrar</button>
+          </div>
+          <div class="deck-card">
+            <img id="homeCover" class="deck-cover" alt="Capa atual" src="">
+            <div class="deck-copy">
+              <strong id="homeTitle">Sistema ocioso</strong>
+              <span id="homeArtist">Nenhuma faixa em reprodução</span>
+            </div>
+          </div>
+        </article>
+        <article class="module panel">
+          <div class="module-head">
+            <p class="eyebrow">Queue Signal</p>
+            <button class="text-action" id="clearQueueAction" type="button">Limpar</button>
+          </div>
+          <div class="mini-queue" id="miniQueue"></div>
+        </article>
+      </div>
+    </section>
+
+    <section class="screen" id="screen-player" data-screen="player">
+      <div class="player-visual panel">
+        <button class="cover-frame" id="openFullscreenCover" type="button" aria-label="Abrir capa em tela cheia">
+          <img id="currentCover" class="current-cover" alt="Capa atual" src="">
+          <span class="cover-glitch">LYRA_SIGNAL</span>
+        </button>
+        <div class="player-meta">
+          <p class="eyebrow">Player</p>
+          <h2 id="currentTitle">Pronto para ouvir</h2>
+          <p id="currentArtist">Adicione músicas do dispositivo para começar.</p>
+        </div>
+        <canvas id="visualizer" width="640" height="180" aria-label="Visualizer do áudio"></canvas>
+      </div>
+
+      <div class="transport panel">
+        <div class="progress-panel">
+          <div class="time-line">
+            <span id="currentTime">0:00</span>
+            <span id="totalTime">0:00</span>
+          </div>
+          <input id="progressRange" type="range" min="0" max="1000" value="0" step="1" aria-label="Barra de progresso">
+        </div>
+        <div class="transport-controls">
+          <button class="icon-button" id="shuffleBtn" type="button" aria-label="Shuffle">
+            <span class="icon icon-shuffle"></span>
+          </button>
+          <button class="icon-button" id="prevBtn" type="button" aria-label="Anterior">
+            <span class="icon icon-prev"></span>
+          </button>
+          <button class="play-button" id="playPauseBtn" type="button" aria-label="Play ou pause">
+            <span class="icon icon-play" id="playPauseIcon"></span>
+          </button>
+          <button class="icon-button" id="nextBtn" type="button" aria-label="Próxima">
+            <span class="icon icon-next"></span>
+          </button>
+          <button class="icon-button" id="loopBtn" type="button" aria-label="Loop">
+            <span class="icon icon-loop"></span>
+          </button>
+        </div>
+        <div class="transport-footer">
+          <label class="volume-wrap" for="volumeRange">
+            <span>Volume</span>
+            <input id="volumeRange" type="range" min="0" max="1" value="0.9" step="0.01">
+          </label>
+          <button class="mode-pill" id="queueJumpBtn" type="button">Fila</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="screen" id="screen-library" data-screen="library">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Biblioteca</p>
+          <h2>Faixas locais</h2>
+        </div>
+        <div class="section-actions">
+          <button class="secondary-action" id="syncDeviceBtn" type="button">Sincronizar MP3s</button>
+          <button class="secondary-action" id="pickSongsBtn" type="button">Adicionar músicas</button>
+          <button class="secondary-action" id="pickCoverBtn" type="button">Capa manual</button>
+        </div>
+      </div>
+      <div class="search-box panel">
+        <input id="searchInput" type="search" placeholder="Buscar por faixa ou artista">
+        <button class="icon-button" id="favoriteFilterBtn" type="button" aria-label="Filtrar favoritos">
+          <span class="icon icon-heart"></span>
+        </button>
+      </div>
+      <div class="track-grid" id="libraryGrid"></div>
+    </section>
+
+    <section class="screen" id="screen-playlists" data-screen="playlists">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Playlists</p>
+          <h2>Rotas de reprodução</h2>
+        </div>
+        <button class="primary-action compact" id="createPlaylistBtn" type="button">Nova playlist</button>
+      </div>
+      <div class="playlist-grid" id="playlistGrid"></div>
+    </section>
+
+    <section class="screen" id="screen-settings" data-screen="settings">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Configurações</p>
+          <h2>Persistência e aparência</h2>
+        </div>
+      </div>
+      <div class="settings-stack">
+        <article class="setting-card panel">
+          <div>
+            <strong>Tema persistente</strong>
+            <small>O app volta no último tema usado.</small>
+          </div>
+          <select id="themeSelect">
+            <option value="breakcore">Breakcore Red</option>
+            <option value="obsidian">Obsidian Static</option>
+            <option value="crimson">Crimson Neon</option>
+          </select>
+        </article>
+        <article class="setting-card panel">
+          <div>
+            <strong>Intensidade glitch</strong>
+            <small>Controla ruído, scanlines e distorção da UI.</small>
+          </div>
+          <input id="glitchIntensity" type="range" min="0" max="100" value="68">
+        </article>
+        <article class="setting-card panel">
+          <div>
+            <strong>Salvar dados locais</strong>
+            <small>Biblioteca e playlists ficam em IndexedDB.</small>
+          </div>
+          <button class="secondary-action compact" id="exportBackupBtn" type="button">Exportar backup</button>
+        </article>
+        <article class="setting-card panel">
+          <div>
+            <strong>Importar backup</strong>
+            <small>Restaura faixas e playlists offline.</small>
+          </div>
+          <button class="secondary-action compact" id="importBackupBtn" type="button">Importar</button>
+        </article>
+      </div>
+    </section>
+
+    <section class="screen" id="screen-glitch" data-screen="glitch">
+      <div class="glitch-mode panel">
+        <div class="glitch-head">
+          <p class="eyebrow">Glitch Mode</p>
+          <h2>Camada de distorção ritualizada</h2>
+          <p>Ative um modo visual mais caótico sem perder fluidez em celulares fracos.</p>
+        </div>
+        <div class="glitch-actions">
+          <button class="primary-action" id="toggleGlitchModeBtn" type="button">Alternar modo glitch</button>
+          <button class="secondary-action" id="pulseUiBtn" type="button">Pulso vermelho</button>
+        </div>
+        <div class="glitch-readout panel">
+          <span>Estado do sistema</span>
+          <strong id="glitchStateLabel">Glitch controlado</strong>
+        </div>
+      </div>
+    </section>
+
+    <aside class="queue-sheet panel" id="queueSheet" aria-hidden="true">
+      <div class="queue-sheet-head">
+        <div>
+          <p class="eyebrow">Fila</p>
+          <h3>Execução atual</h3>
+        </div>
+        <button class="icon-button" id="closeQueueBtn" type="button" aria-label="Fechar fila">
+          <span class="icon icon-close"></span>
+        </button>
+      </div>
+      <div class="queue-list" id="queueList"></div>
+    </aside>
+
+    <div class="fullscreen-player" id="fullscreenPlayer" aria-hidden="true">
+      <div class="fullscreen-backdrop"></div>
+      <div class="fullscreen-card panel">
+        <button class="icon-button close-floating" id="closeFullscreenBtn" type="button" aria-label="Fechar tela cheia">
+          <span class="icon icon-close"></span>
+        </button>
+        <img id="fullscreenCover" class="fullscreen-cover" alt="Capa em tela cheia" src="">
+        <div class="fullscreen-copy">
+          <p class="eyebrow">Now Playing</p>
+          <h2 id="fullscreenTitle">Lyra</h2>
+          <p id="fullscreenArtist">Breakcore OS</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-shell" id="playlistModal" aria-hidden="true">
+      <div class="modal-card panel">
+        <div class="modal-head">
+          <h3>Nova playlist</h3>
+          <button class="icon-button" id="closePlaylistModalBtn" type="button" aria-label="Fechar modal">
+            <span class="icon icon-close"></span>
+          </button>
+        </div>
+        <label class="field">
+          <span>Nome</span>
+          <input id="playlistNameInput" type="text" maxlength="48" placeholder="Ex: RAGE SIGNAL">
+        </label>
+        <button class="primary-action" id="savePlaylistBtn" type="button">Salvar playlist</button>
+      </div>
+    </div>
+
+    <div class="toast-stack" id="toastStack" aria-live="polite"></div>
+
+    <nav class="bottom-nav panel" aria-label="Navegação principal">
+      <button class="nav-item active" type="button" data-open-screen="home">
+        <span class="icon icon-home"></span>
+        <span>Launcher</span>
+      </button>
+      <button class="nav-item" type="button" data-open-screen="player">
+        <span class="icon icon-disc"></span>
+        <span>Player</span>
+      </button>
+      <button class="nav-item" type="button" data-open-screen="library">
+        <span class="icon icon-library"></span>
+        <span>Biblioteca</span>
+      </button>
+      <button class="nav-item" type="button" data-open-screen="playlists">
+        <span class="icon icon-stack"></span>
+        <span>Playlists</span>
+      </button>
+      <button class="nav-item" type="button" data-open-screen="settings">
+        <span class="icon icon-cog"></span>
+        <span>Ajustes</span>
+      </button>
+    </nav>
+  </main>
+
+  <audio id="audioElement" preload="metadata"></audio>
+  <input id="songFileInput" type="file" accept="audio/*" multiple hidden>
+  <input id="coverFileInput" type="file" accept="image/*" hidden>
+  <input id="backupFileInput" type="file" accept="application/json,.json" hidden>
+
+  <script src="./app.js" type="module"></script>
+</body>
+</html>
