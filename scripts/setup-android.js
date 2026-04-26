@@ -139,52 +139,56 @@ public class LyraMediaScannerPlugin extends Plugin {
                 int modifiedIndex = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATE_MODIFIED);
 
                 while (cursor.moveToNext()) {
-                    long mediaStoreId = cursor.getLong(idIndex);
-                    long modifiedSeconds = cursor.getLong(modifiedIndex);
-                    long modifiedMs = modifiedSeconds * 1000L;
-                    long size = cursor.getLong(sizeIndex);
-                    long duration = cursor.getLong(durationIndex);
-                    Uri contentUri = ContentUris.withAppendedId(collection, mediaStoreId);
+                    try {
+                        long mediaStoreId = cursor.getLong(idIndex);
+                        long modifiedSeconds = cursor.getLong(modifiedIndex);
+                        long modifiedMs = modifiedSeconds * 1000L;
+                        long size = cursor.getLong(sizeIndex);
+                        long duration = cursor.getLong(durationIndex);
+                        Uri contentUri = ContentUris.withAppendedId(collection, mediaStoreId);
 
-                    String safeTitle = safeText(cursor.getString(titleIndex), fileNameWithoutExt(cursor.getString(nameIndex)));
-                    String safeArtist = safeText(cursor.getString(artistIndex), "Unknown");
-                    String safeAlbum = safeText(cursor.getString(albumIndex), "");
-                    String displayName = safeText(cursor.getString(nameIndex), "track.mp3");
-                    String audioFileName = "device-" + mediaStoreId + "-" + modifiedSeconds + extensionFromDisplayName(displayName);
-                    File audioFile = new File(audioDir, audioFileName);
+                        String safeTitle = safeText(cursor.getString(titleIndex), fileNameWithoutExt(cursor.getString(nameIndex)));
+                        String safeArtist = safeText(cursor.getString(artistIndex), "Unknown");
+                        String safeAlbum = safeText(cursor.getString(albumIndex), "");
+                        String displayName = safeText(cursor.getString(nameIndex), "track.mp3");
+                        String audioFileName = "device-" + mediaStoreId + "-" + modifiedSeconds + extensionFromDisplayName(displayName);
+                        File audioFile = new File(audioDir, audioFileName);
 
-                    if (!audioFile.exists() || audioFile.length() != size) {
-                        deleteLegacyCopies(audioDir, "device-" + mediaStoreId + "-");
-                        copyUriToFile(resolver, contentUri, audioFile);
+                        if (!audioFile.exists() || audioFile.length() != size) {
+                            deleteLegacyCopies(audioDir, "device-" + mediaStoreId + "-");
+                            copyUriToFile(resolver, contentUri, audioFile);
+                        }
+
+                        String coverPath = "";
+                        byte[] artBytes = readEmbeddedArt(contentUri);
+                        if (artBytes != null && artBytes.length > 0) {
+                            String coverExtension = imageExtensionFromBytes(artBytes);
+                            File coverFile = new File(coverDir, "device-" + mediaStoreId + "-" + modifiedSeconds + coverExtension);
+                            deleteLegacyCopies(coverDir, "device-" + mediaStoreId + "-");
+                            writeBytes(coverFile, artBytes);
+                            coverPath = coverFile.getAbsolutePath();
+                        }
+
+                        int stableId = (int) -mediaStoreId;
+                        syncedIds.add(String.valueOf(stableId));
+
+                        JSObject item = new JSObject();
+                        item.put("id", stableId);
+                        item.put("mediaStoreId", mediaStoreId);
+                        item.put("source", "device");
+                        item.put("title", safeTitle);
+                        item.put("artist", safeArtist);
+                        item.put("album", safeAlbum);
+                        item.put("filePath", audioFile.getAbsolutePath());
+                        item.put("coverPath", coverPath);
+                        item.put("duration", duration);
+                        item.put("size", size);
+                        item.put("addedAt", modifiedMs);
+                        item.put("updatedAt", modifiedMs);
+                        songs.put(item);
+                    } catch (Exception ignored) {
+                        // Skip problematic files without aborting the whole library.
                     }
-
-                    String coverPath = "";
-                    byte[] artBytes = readEmbeddedArt(contentUri);
-                    if (artBytes != null && artBytes.length > 0) {
-                        String coverExtension = imageExtensionFromBytes(artBytes);
-                        File coverFile = new File(coverDir, "device-" + mediaStoreId + "-" + modifiedSeconds + coverExtension);
-                        deleteLegacyCopies(coverDir, "device-" + mediaStoreId + "-");
-                        writeBytes(coverFile, artBytes);
-                        coverPath = coverFile.getAbsolutePath();
-                    }
-
-                    int stableId = (int) -mediaStoreId;
-                    syncedIds.add(String.valueOf(stableId));
-
-                    JSObject item = new JSObject();
-                    item.put("id", stableId);
-                    item.put("mediaStoreId", mediaStoreId);
-                    item.put("source", "device");
-                    item.put("title", safeTitle);
-                    item.put("artist", safeArtist);
-                    item.put("album", safeAlbum);
-                    item.put("filePath", audioFile.getAbsolutePath());
-                    item.put("coverPath", coverPath);
-                    item.put("duration", duration);
-                    item.put("size", size);
-                    item.put("addedAt", modifiedMs);
-                    item.put("updatedAt", modifiedMs);
-                    songs.put(item);
                 }
             }
 
@@ -267,8 +271,8 @@ public class LyraMediaScannerPlugin extends Plugin {
         if (bytes.length >= 8 &&
             bytes[0] == (byte) 0x89 &&
             bytes[1] == 0x50 &&
-            bytes[2] == (byte) 0x4E &&
-            bytes[3] == (byte) 0x47) {
+            bytes[2] == 0x4E &&
+            bytes[3] == 0x47) {
             return ".png";
         }
         if (bytes.length >= 3 &&
