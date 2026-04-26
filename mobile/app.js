@@ -23,6 +23,7 @@ const PLACEHOLDER_COVER =
 const state = {
   db: null,
   songs: [],
+  filteredSongs: [],
   playlists: [],
   queue: [],
   currentSongId: null,
@@ -88,10 +89,21 @@ const refs = {
   visualizer: document.getElementById("visualizer"),
   playlistModal: document.getElementById("playlistModal"),
   playlistNameInput: document.getElementById("playlistNameInput"),
+  libraryScopeStatus: document.getElementById("libraryScopeStatus"),
   statTracks: document.getElementById("statTracks"),
   statPlaylists: document.getElementById("statPlaylists"),
   statQueue: document.getElementById("statQueue"),
-  syncDeviceBtn: document.getElementById("syncDeviceBtn")
+  syncDeviceBtn: document.getElementById("syncDeviceBtn"),
+  miniPlayer: document.getElementById("miniPlayer"),
+  miniPlayerOpenBtn: document.getElementById("miniPlayerOpenBtn"),
+  miniPlayerCover: document.getElementById("miniPlayerCover"),
+  miniPlayerTitle: document.getElementById("miniPlayerTitle"),
+  miniPlayerArtist: document.getElementById("miniPlayerArtist"),
+  miniPlayerProgress: document.getElementById("miniPlayerProgress"),
+  miniPlayPauseBtn: document.getElementById("miniPlayPauseBtn"),
+  miniPlayPauseIcon: document.getElementById("miniPlayPauseIcon"),
+  miniPrevBtn: document.getElementById("miniPrevBtn"),
+  miniNextBtn: document.getElementById("miniNextBtn")
 };
 
 init().catch(error => {
@@ -127,6 +139,19 @@ function bindEvents() {
   document.getElementById("openNowPlaying").addEventListener("click", openFullscreen);
   document.getElementById("openFullscreenCover").addEventListener("click", openFullscreen);
   document.getElementById("closeFullscreenBtn").addEventListener("click", closeFullscreen);
+  refs.miniPlayerOpenBtn.addEventListener("click", () => openScreen("player"));
+  refs.miniPlayPauseBtn.addEventListener("click", event => {
+    event.stopPropagation();
+    togglePlayback();
+  });
+  refs.miniPrevBtn.addEventListener("click", event => {
+    event.stopPropagation();
+    previousTrack();
+  });
+  refs.miniNextBtn.addEventListener("click", event => {
+    event.stopPropagation();
+    nextTrack(false);
+  });
   document.getElementById("closeQueueBtn").addEventListener("click", toggleQueueSheet);
   document.getElementById("queueJumpBtn").addEventListener("click", toggleQueueSheet);
   document.getElementById("clearQueueAction").addEventListener("click", clearQueueFilters);
@@ -348,6 +373,7 @@ function revokeSongUrls() {
     try {
       URL.revokeObjectURL(url);
     } catch {
+      // noop
     }
   });
   state.objectUrls = [];
@@ -358,14 +384,39 @@ function openScreen(screenId) {
   document.querySelectorAll(".nav-item").forEach(item => item.classList.toggle("active", item.dataset.openScreen === screenId));
 }
 
-function updateQueue() {
-  state.queue = state.songs.filter(song => {
+function syncFilteredSongs() {
+  state.filteredSongs = state.songs.filter(song => {
     const text = `${song.title} ${song.artist}`.toLowerCase();
     const matchesSearch = text.includes(state.searchTerm);
     const matchesPlaylist = state.selectedPlaylistId ? (song.playlists || []).includes(state.selectedPlaylistId) : true;
     const matchesFav = state.favoritesOnly ? Boolean(song.isFavorite) : true;
     return matchesSearch && matchesPlaylist && matchesFav;
   });
+}
+
+function updateQueue(resetQueue = false) {
+  syncFilteredSongs();
+  const songMap = new Map(state.songs.map(song => [song.id, song]));
+  const normalizedQueue = state.queue
+    .map(song => songMap.get(song.id))
+    .filter(Boolean);
+
+  if (resetQueue) {
+    state.queue = state.filteredSongs.slice();
+  } else if (!normalizedQueue.length) {
+    state.queue = (state.filteredSongs.length ? state.filteredSongs : state.songs).slice();
+  } else {
+    const knownIds = new Set(normalizedQueue.map(song => song.id));
+    const appendedSongs = state.songs.filter(song => !knownIds.has(song.id));
+    state.queue = [...normalizedQueue, ...appendedSongs];
+  }
+
+  if (state.currentSongId && !state.queue.some(song => song.id === state.currentSongId)) {
+    state.currentSongId = null;
+    state.currentQueueIndex = -1;
+    refs.audio.pause();
+    refs.audio.removeAttribute("src");
+  }
   syncCurrentQueueIndex();
 }
 
@@ -388,17 +439,18 @@ function renderAll() {
 }
 
 function renderLibrary() {
-  if (!state.queue.length) {
+  if (!state.filteredSongs.length) {
     refs.libraryGrid.innerHTML = `
       <article class="empty-state">
         <strong>Nenhuma faixa visível.</strong>
         <p>Importe músicas, troque a busca ou mude o filtro para povoar o sistema.</p>
       </article>
     `;
+    syncLibraryScope();
     return;
   }
 
-  refs.libraryGrid.innerHTML = state.queue
+  refs.libraryGrid.innerHTML = state.filteredSongs
     .map(song => {
       const playing = song.id === state.currentSongId;
       const inPlaylist = (song.playlists || []).length;
@@ -424,6 +476,7 @@ function renderLibrary() {
   refs.libraryGrid.querySelectorAll("[data-action]").forEach(button => {
     button.addEventListener("click", handleLibraryAction);
   });
+  syncLibraryScope();
 }
 
 function renderPlaylists() {
@@ -530,6 +583,10 @@ function syncPlayerMeta() {
   refs.fullscreenCover.src = currentSong?.coverUrl || PLACEHOLDER_COVER;
   refs.fullscreenTitle.textContent = currentSong?.title || "Lyra";
   refs.fullscreenArtist.textContent = currentSong?.artist || "Breakcore OS";
+  refs.miniPlayerCover.src = currentSong?.coverUrl || PLACEHOLDER_COVER;
+  refs.miniPlayerTitle.textContent = currentSong?.title || "Lyra Breakcore OS";
+  refs.miniPlayerArtist.textContent = currentSong?.artist || "Aguardando faixa";
+  refs.miniPlayer.hidden = !currentSong && !state.queue.length;
 }
 
 function syncControls() {
@@ -540,16 +597,23 @@ function syncControls() {
   refs.favoriteFilterBtn.classList.toggle("active", state.favoritesOnly);
   const playing = !refs.audio.paused && Boolean(refs.audio.src);
   refs.playPauseIcon.className = `icon ${playing ? "icon-pause" : "icon-play"}`;
+  refs.miniPlayPauseIcon.className = `icon ${playing ? "icon-pause" : "icon-play"}`;
   refs.playPauseBtn.setAttribute("aria-label", playing ? "Pausar" : "Tocar");
+  refs.miniPlayPauseBtn.setAttribute("aria-label", playing ? "Pausar" : "Tocar");
   refs.glitchStateLabel.textContent = state.glitchMode ? "Sobrecarga ativa" : "Glitch controlado";
 }
 
 function syncProgress() {
   const current = Number.isFinite(refs.audio.currentTime) ? refs.audio.currentTime : 0;
   const duration = Number.isFinite(refs.audio.duration) ? refs.audio.duration : 0;
+  const ratio = duration > 0 ? current / duration : 0;
   refs.currentTime.textContent = formatTime(current);
   refs.totalTime.textContent = formatTime(duration);
-  refs.progressRange.value = duration > 0 ? String(Math.round((current / duration) * 1000)) : "0";
+  refs.progressRange.value = duration > 0 ? String(Math.round(ratio * 1000)) : "0";
+  refs.miniPlayerProgress.textContent = duration > 0
+    ? `${formatTime(current)} / ${formatTime(duration)}`
+    : "0:00 / 0:00";
+  refs.miniPlayerProgress.style.background = `linear-gradient(90deg, rgba(239, 68, 68, 0.52) 0%, rgba(239, 68, 68, 0.52) ${Math.round(ratio * 100)}%, rgba(239, 68, 68, 0.08) ${Math.round(ratio * 100)}%, rgba(239, 68, 68, 0.08) 100%)`;
 }
 
 function handleLibraryAction(event) {
@@ -559,7 +623,7 @@ function handleLibraryAction(event) {
   const id = Number(songId);
 
   if (action === "play-song") {
-    const index = state.queue.findIndex(song => song.id === id);
+    const index = ensureSongQueued(id);
     if (index >= 0) playFromQueue(index);
   } else if (action === "favorite-song") {
     toggleFavorite(id);
@@ -586,7 +650,7 @@ function handlePlaylistAction(event) {
   const id = Number(playlistId);
   if (action === "queue-playlist") {
     state.selectedPlaylistId = id;
-    updateQueue();
+    updateQueue(true);
     renderAll();
     if (state.queue.length) playFromQueue(0);
     openScreen("player");
@@ -848,7 +912,13 @@ async function playFromQueue(index, switchScreen = true) {
   state.currentQueueIndex = index;
   refs.audio.src = song.audioUrl;
   ensureAudioGraph();
-  await refs.audio.play();
+  try {
+    await refs.audio.play();
+  } catch (error) {
+    console.error(error);
+    toast("Player", "Não foi possível iniciar essa faixa.");
+    return;
+  }
   state.shuffledPool = [];
   syncPlayerMeta();
   syncControls();
@@ -857,19 +927,25 @@ async function playFromQueue(index, switchScreen = true) {
   renderQueue();
   renderHome();
   updateMediaSession();
+  refs.miniPlayer.hidden = false;
   if (switchScreen) openScreen("player");
 }
 
-function togglePlayback() {
+async function togglePlayback() {
   if (!refs.audio.src) {
     if (state.queue.length) {
-      playFromQueue(Math.max(state.currentQueueIndex, 0));
+      await playFromQueue(Math.max(state.currentQueueIndex, 0));
     }
     return;
   }
 
   if (refs.audio.paused) {
-    refs.audio.play();
+    try {
+      await refs.audio.play();
+    } catch (error) {
+      console.error(error);
+      toast("Player", "Toque na faixa novamente para liberar o áudio.");
+    }
   } else {
     refs.audio.pause();
   }
@@ -886,13 +962,13 @@ function previousTrack() {
     return;
   }
   const nextIndex = state.currentQueueIndex <= 0 ? state.queue.length - 1 : state.currentQueueIndex - 1;
-  playFromQueue(nextIndex, false);
+  void playFromQueue(nextIndex, false);
 }
 
 function nextTrack(fromEnded) {
   if (!state.queue.length) return;
   if (state.shuffle) {
-    playFromQueue(nextShuffleIndex(), false);
+    void playFromQueue(nextShuffleIndex(), false);
     return;
   }
   const atLast = state.currentQueueIndex >= state.queue.length - 1;
@@ -904,7 +980,7 @@ function nextTrack(fromEnded) {
     return;
   }
   const nextIndex = atLast ? 0 : state.currentQueueIndex + 1;
-  playFromQueue(nextIndex, false);
+  void playFromQueue(nextIndex, false);
 }
 
 function handleTrackEnd() {
@@ -989,6 +1065,31 @@ function updateMediaSession() {
       syncProgress();
     }
   });
+}
+
+function syncLibraryScope() {
+  const scopes = [];
+  if (state.selectedPlaylistId) {
+    const playlist = state.playlists.find(item => item.id === state.selectedPlaylistId);
+    if (playlist) scopes.push(`Playlist: ${playlist.name}`);
+  }
+  if (state.favoritesOnly) scopes.push("Favoritos");
+  if (state.searchTerm) scopes.push(`Busca: "${state.searchTerm}"`);
+  refs.libraryScopeStatus.textContent = scopes.length
+    ? `Filtros ativos: ${scopes.join(" • ")}.`
+    : "Exibindo toda a biblioteca.";
+}
+
+function ensureSongQueued(songId) {
+  const existingIndex = state.queue.findIndex(song => song.id === songId);
+  if (existingIndex >= 0) return existingIndex;
+  const song = state.songs.find(item => item.id === songId);
+  if (!song) return -1;
+  state.queue = [song, ...state.queue.filter(item => item.id !== songId)];
+  syncCurrentQueueIndex();
+  renderQueue();
+  syncStats();
+  return 0;
 }
 
 async function exportBackup() {
