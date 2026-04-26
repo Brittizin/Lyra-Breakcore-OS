@@ -153,8 +153,8 @@ public class LyraMediaScannerPlugin extends Plugin {
                     String audioFileName = "device-" + mediaStoreId + "-" + modifiedSeconds + extensionFromDisplayName(displayName);
                     File audioFile = new File(audioDir, audioFileName);
 
-                    deleteLegacyCopies(audioDir, "device-" + mediaStoreId + "-");
                     if (!audioFile.exists() || audioFile.length() != size) {
+                        deleteLegacyCopies(audioDir, "device-" + mediaStoreId + "-");
                         copyUriToFile(resolver, contentUri, audioFile);
                     }
 
@@ -220,6 +220,7 @@ public class LyraMediaScannerPlugin extends Plugin {
             try {
                 retriever.release();
             } catch (RuntimeException ignored) {
+                // noop
             }
         }
     }
@@ -255,16 +256,19 @@ public class LyraMediaScannerPlugin extends Plugin {
 
     private String extensionFromDisplayName(String name) {
         if (name == null) return ".mp3";
-        String lower = name.toLowerCase(Locale.ROOT);
-        return lower.endsWith(".mp3") ? ".mp3" : ".mp3";
+        int dotIndex = name.lastIndexOf('.');
+        if (dotIndex >= 0 && dotIndex < name.length() - 1) {
+            return name.substring(dotIndex).toLowerCase(Locale.ROOT);
+        }
+        return ".mp3";
     }
 
     private String imageExtensionFromBytes(@NonNull byte[] bytes) {
         if (bytes.length >= 8 &&
             bytes[0] == (byte) 0x89 &&
             bytes[1] == 0x50 &&
-            bytes[2] == 0x4E &&
-            bytes[3] == 0x47) {
+            bytes[2] == (byte) 0x4E &&
+            bytes[3] == (byte) 0x47) {
             return ".png";
         }
         if (bytes.length >= 3 &&
