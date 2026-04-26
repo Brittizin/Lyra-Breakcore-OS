@@ -268,6 +268,23 @@ function getMediaScannerPlugin() {
   return window.Capacitor?.Plugins?.LyraMediaScanner || null;
 }
 
+function getSyncErrorMessage(error) {
+  const raw = typeof error === "string"
+    ? error
+    : error?.message || error?.errorMessage || error?.detail || "";
+  const message = String(raw || "").trim();
+  if (!message) {
+    return "Não foi possível sincronizar os MP3s do aparelho.";
+  }
+  if (/permission|denied|not granted|unauthorized/i.test(message)) {
+    return "Permita o acesso aos arquivos de áudio para importar os MP3s do celular.";
+  }
+  if (/plugin|scanner/i.test(message)) {
+    return "Este APK não carregou o leitor nativo de MP3s corretamente.";
+  }
+  return message;
+}
+
 function persistSettings() {
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
 }
@@ -544,7 +561,7 @@ function renderQueue() {
 
   refs.queueList.innerHTML = queueItems;
   refs.miniQueue.innerHTML = state.queue.slice(0, 4).map((song, index) => `
-    <button class="mini-queue-item" data-queue-index="${index}">
+    <button class="queue-item ${song.id === state.currentSongId ? "active" : ""}" data-queue-index="${index}">
       <img src="${song.coverUrl}" alt="Capa de ${escapeHtml(song.title)}">
       <div class="track-meta">
         <strong>${escapeHtml(song.title)}</strong>
@@ -552,13 +569,12 @@ function renderQueue() {
       </div>
       <span>${index + 1}</span>
     </button>
-  `).join("") || `<div class="empty-state"><strong>Sem sinal.</strong><p>Adicione músicas para iniciar.</p></div>`;
+  `).join("");
 
-  refs.queueList.querySelectorAll("[data-queue-index]").forEach(button => {
-    button.addEventListener("click", () => playFromQueue(Number(button.dataset.queueIndex)));
-  });
-  refs.miniQueue.querySelectorAll("[data-queue-index]").forEach(button => {
-    button.addEventListener("click", () => playFromQueue(Number(button.dataset.queueIndex)));
+  [refs.queueList, refs.miniQueue].forEach(scope => {
+    scope.querySelectorAll("[data-queue-index]").forEach(button => {
+      button.addEventListener("click", () => playFromQueue(Number(button.dataset.queueIndex), false));
+    });
   });
 }
 
@@ -692,7 +708,13 @@ async function importSongs(fileList) {
 async function autoSyncDeviceLibrary(showToast = false) {
   if (!isNativeAndroid()) return;
   const plugin = getMediaScannerPlugin();
-  if (!plugin || state.deviceSyncInFlight) return;
+  if (state.deviceSyncInFlight) return;
+  if (!plugin?.syncDeviceLibrary) {
+    if (showToast) {
+      toast("Android", "Este APK não tem o leitor nativo de MP3s ativo.");
+    }
+    return;
+  }
 
   state.deviceSyncInFlight = true;
   refs.syncDeviceBtn.disabled = true;
@@ -729,9 +751,10 @@ async function autoSyncDeviceLibrary(showToast = false) {
       toast("Android", `${songs.length} MP3(s) reconhecido(s) do celular.`);
     }
   } catch (error) {
-    console.error(error);
+    const message = getSyncErrorMessage(error);
+    console.error("Device sync failed:", message, error);
     if (showToast) {
-      toast("Android", "Não foi possível sincronizar os MP3s do aparelho.");
+      toast("Android", message);
     }
   } finally {
     state.deviceSyncInFlight = false;
