@@ -55,11 +55,12 @@ import java.util.Set;
     name = "LyraMediaScanner",
     permissions = {
         @Permission(
-            alias = "audio",
-            strings = {
-                Manifest.permission.READ_MEDIA_AUDIO,
-                Manifest.permission.READ_EXTERNAL_STORAGE
-            }
+            alias = "audioModern",
+            strings = { Manifest.permission.READ_MEDIA_AUDIO }
+        ),
+        @Permission(
+            alias = "audioLegacy",
+            strings = { Manifest.permission.READ_EXTERNAL_STORAGE }
         )
     }
 )
@@ -67,8 +68,9 @@ public class LyraMediaScannerPlugin extends Plugin {
 
     @PluginMethod
     public void syncDeviceLibrary(PluginCall call) {
-        if (getPermissionState("audio") != PermissionState.GRANTED) {
-            requestPermissionForAlias("audio", call, "permissionCallback");
+        String alias = activeAudioPermissionAlias();
+        if (getPermissionState(alias) != PermissionState.GRANTED) {
+            requestPermissionForAlias(alias, call, "permissionCallback");
             return;
         }
         runScan(call);
@@ -77,13 +79,13 @@ public class LyraMediaScannerPlugin extends Plugin {
     @PluginMethod
     public void getPermissionStatus(PluginCall call) {
         JSObject result = new JSObject();
-        result.put("granted", getPermissionState("audio") == PermissionState.GRANTED);
+        result.put("granted", getPermissionState(activeAudioPermissionAlias()) == PermissionState.GRANTED);
         call.resolve(result);
     }
 
     @PermissionCallback
     private void permissionCallback(PluginCall call) {
-        if (getPermissionState("audio") != PermissionState.GRANTED) {
+        if (getPermissionState(activeAudioPermissionAlias()) != PermissionState.GRANTED) {
             call.reject("Audio permission denied.");
             return;
         }
@@ -116,10 +118,8 @@ public class LyraMediaScannerPlugin extends Plugin {
                 MediaStore.Audio.Media.IS_MUSIC
             };
 
-            String selection =
-                "(" + MediaStore.Audio.Media.MIME_TYPE + "=? OR " + MediaStore.Audio.Media.DISPLAY_NAME + " LIKE ?)" +
-                " AND " + MediaStore.Audio.Media.IS_MUSIC + "!=0";
-            String[] selectionArgs = new String[] { "audio/mpeg", "%.mp3" };
+            String selection = MediaStore.Audio.Media.IS_MUSIC + "!=0";
+            String[] selectionArgs = null;
             String sortOrder = MediaStore.Audio.Media.DATE_MODIFIED + " DESC";
 
             ContentResolver resolver = getContext().getContentResolver();
@@ -134,12 +134,19 @@ public class LyraMediaScannerPlugin extends Plugin {
                 int artistIndex = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST);
                 int albumIndex = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM);
                 int nameIndex = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DISPLAY_NAME);
+                int mimeIndex = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.MIME_TYPE);
                 int sizeIndex = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.SIZE);
                 int durationIndex = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION);
                 int modifiedIndex = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATE_MODIFIED);
 
                 while (cursor.moveToNext()) {
                     try {
+                        String displayName = safeText(cursor.getString(nameIndex), "track.mp3");
+                        String mimeType = safeText(cursor.getString(mimeIndex), "");
+                        if (!isMp3Candidate(displayName, mimeType)) {
+                            continue;
+                        }
+
                         long mediaStoreId = cursor.getLong(idIndex);
                         long modifiedSeconds = cursor.getLong(modifiedIndex);
                         long modifiedMs = modifiedSeconds * 1000L;
@@ -147,10 +154,9 @@ public class LyraMediaScannerPlugin extends Plugin {
                         long duration = cursor.getLong(durationIndex);
                         Uri contentUri = ContentUris.withAppendedId(collection, mediaStoreId);
 
-                        String safeTitle = safeText(cursor.getString(titleIndex), fileNameWithoutExt(cursor.getString(nameIndex)));
+                        String safeTitle = safeText(cursor.getString(titleIndex), fileNameWithoutExt(displayName));
                         String safeArtist = safeText(cursor.getString(artistIndex), "Unknown");
                         String safeAlbum = safeText(cursor.getString(albumIndex), "");
-                        String displayName = safeText(cursor.getString(nameIndex), "track.mp3");
                         String audioFileName = "device-" + mediaStoreId + "-" + modifiedSeconds + extensionFromDisplayName(displayName);
                         File audioFile = new File(audioDir, audioFileName);
 
@@ -199,6 +205,10 @@ public class LyraMediaScannerPlugin extends Plugin {
         } catch (Exception error) {
             call.reject("Failed to sync the device library.", error);
         }
+    }
+
+    private String activeAudioPermissionAlias() {
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU ? "audioModern" : "audioLegacy";
     }
 
     private void copyUriToFile(ContentResolver resolver, Uri sourceUri, File targetFile) throws IOException {
@@ -265,6 +275,16 @@ public class LyraMediaScannerPlugin extends Plugin {
             return name.substring(dotIndex).toLowerCase(Locale.ROOT);
         }
         return ".mp3";
+    }
+
+    private boolean isMp3Candidate(String displayName, String mimeType) {
+        String lowerName = displayName == null ? "" : displayName.toLowerCase(Locale.ROOT);
+        String lowerMime = mimeType == null ? "" : mimeType.toLowerCase(Locale.ROOT);
+        return lowerName.endsWith(".mp3") ||
+            lowerMime.equals("audio/mpeg") ||
+            lowerMime.equals("audio/mp3") ||
+            lowerMime.equals("audio/x-mpeg") ||
+            lowerMime.equals("audio/x-mp3");
     }
 
     private String imageExtensionFromBytes(@NonNull byte[] bytes) {
