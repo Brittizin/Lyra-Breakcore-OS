@@ -28,7 +28,7 @@
   <main class="app-shell">
     <header class="topbar panel">
       <div>
-        <p class="eyebrow">Music Launcher</p>
+        <p class="eyebrow">Sistema musical</p>
         <h1>Lyra <span>Breakcore OS</span></h1>
       </div>
       <button class="icon-button accent-ring" id="openNowPlaying" type="button" aria-label="Abrir modo tela cheia">
@@ -67,7 +67,7 @@
       <div class="launcher-panels">
         <article class="module panel">
           <div class="module-head">
-            <p class="eyebrow">Active Deck</p>
+            <p class="eyebrow">Deck ativo</p>
             <button class="text-action" type="button" data-open-screen="player">Entrar</button>
           </div>
           <div class="deck-card">
@@ -80,8 +80,8 @@
         </article>
         <article class="module panel">
           <div class="module-head">
-            <p class="eyebrow">Queue Signal</p>
-            <button class="text-action" id="clearQueueAction" type="button">Limpar</button>
+            <p class="eyebrow">Sinal da fila</p>
+            <button class="text-action" id="clearQueueAction" type="button">Limpar filtros</button>
           </div>
           <div class="mini-queue" id="miniQueue"></div>
         </article>
@@ -155,6 +155,7 @@
           <span class="icon icon-heart"></span>
         </button>
       </div>
+      <div class="library-status panel" id="libraryScopeStatus">Exibindo toda a biblioteca.</div>
       <div class="track-grid" id="libraryGrid"></div>
     </section>
 
@@ -251,7 +252,7 @@
         </button>
         <img id="fullscreenCover" class="fullscreen-cover" alt="Capa em tela cheia" src="">
         <div class="fullscreen-copy">
-          <p class="eyebrow">Now Playing</p>
+          <p class="eyebrow">Tocando agora</p>
           <h2 id="fullscreenTitle">Lyra</h2>
           <p id="fullscreenArtist">Breakcore OS</p>
         </div>
@@ -276,10 +277,35 @@
 
     <div class="toast-stack" id="toastStack" aria-live="polite"></div>
 
+    <section class="mini-player panel" id="miniPlayer" aria-label="Mini player" hidden>
+      <button class="mini-player-main" id="miniPlayerOpenBtn" type="button">
+        <img id="miniPlayerCover" class="mini-player-cover" alt="Capa atual do mini player" src="">
+        <div class="mini-player-copy">
+          <span class="eyebrow">Tocando agora</span>
+          <strong id="miniPlayerTitle">Lyra</strong>
+          <small id="miniPlayerArtist">Aguardando faixa</small>
+        </div>
+      </button>
+      <div class="mini-player-controls">
+        <button class="icon-button compact-icon" id="miniPrevBtn" type="button" aria-label="Faixa anterior">
+          <span class="icon icon-prev"></span>
+        </button>
+        <button class="icon-button compact-icon accent-ring" id="miniPlayPauseBtn" type="button" aria-label="Reproduzir ou pausar">
+          <span class="icon icon-play" id="miniPlayPauseIcon"></span>
+        </button>
+        <button class="icon-button compact-icon" id="miniNextBtn" type="button" aria-label="Próxima faixa">
+          <span class="icon icon-next"></span>
+        </button>
+      </div>
+      <div class="mini-player-progress">
+        <span id="miniPlayerProgress"></span>
+      </div>
+    </section>
+
     <nav class="bottom-nav panel" aria-label="Navegação principal">
       <button class="nav-item active" type="button" data-open-screen="home">
         <span class="icon icon-home"></span>
-        <span>Launcher</span>
+        <span>Início</span>
       </button>
       <button class="nav-item" type="button" data-open-screen="player">
         <span class="icon icon-disc"></span>
