@@ -219,7 +219,7 @@ public class LyraMediaScannerPlugin extends Plugin {
         } finally {
             try {
                 retriever.release();
-            } catch (RuntimeException ignored) {
+            } catch (Exception ignored) {
                 // noop
             }
         }
